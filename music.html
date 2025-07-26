@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>数字で作曲 - Pro</title>
+  <style>
+    body { font-family: sans-serif; padding: 2em; background: #f7f7f7; }
+    input, textarea, button { margin: 0.5em 0; width: 100%; padding: 0.5em; font-size: 1em; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🎶 数字で作曲 Pro</h1>
+
+  <label>🎵 曲タイトル</label>
+  <input type="text" id="title" placeholder="タイトルを入力">
+
+  <label>🎼 メロディ（1〜7: ドレミファソラシ、0: 休符、-: コード）</label>
+  <textarea id="noteInput" rows="4" placeholder="例: 1230456-135"></textarea>
+  <button onclick="suggestMelody()">🎹 AIで補完</button>
+
+  <label>⏱️ テンポ（BPM）</label>
+  <input type="number" id="bpm" value="120">
+
+  <button onclick="playMusic()">▶️ 再生</button>
+  <button onclick="stopMusic()">⏹️ 停止</button>
+  <button onclick="resetForm()">🔁 リセット</button>
+
+  <script>
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    let scheduled = [];
+
+    const notes = {
+      "1": 261.63,  "2": 293.66,  "3": 329.63,
+      "4": 349.23,  "5": 392.00,  "6": 440.00,  "7": 493.88
+    };
+
+    function playTone(freq, duration = 0.5, startAt = 0) {
+      const osc = context.createOscillator();
+      const gain = context.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(context.destination);
+      osc.start(context.currentTime + startAt);
+      osc.stop(context.currentTime + startAt + duration);
+      scheduled.push(osc);
+    }
+
+    function playChord(freqs, duration = 0.5, startAt = 0) {
+      freqs.forEach(freq => playTone(freq, duration, startAt));
+    }
+
+    function playMusic() {
+      stopMusic();
+      const bpm = parseInt(document.getElementById("bpm").value);
+      const interval = 60 / bpm;
+      const input = document.getElementById("noteInput").value.trim();
+      const notesArr = input.split('');
+      let time = 0;
+
+      for (let i = 0; i < notesArr.length; i++) {
+        const char = notesArr[i];
+        if (char === "0") {
+          time += interval;
+        } else if (char === "-") {
+          const prev = notesArr.slice(Math.max(0, i - 3), i);
+          const freqs = prev.map(n => notes[n]).filter(f => f);
+          if (freqs.length > 0) {
+            playChord(freqs, interval, time);
+            time += interval;
+          }
+        } else if (notes[char]) {
+          playTone(notes[char], interval, time);
+          time += interval;
+        }
+      }
+    }
+
+    function stopMusic() {
+      scheduled.forEach(osc => { try { osc.stop(); } catch (e) {} });
+      scheduled = [];
+    }
+
+    function resetForm() {
+      document.getElementById("noteInput").value = "";
+      document.getElementById("title").value = "";
+    }
+
+    function suggestMelody() {
+      const input = document.getElementById("noteInput").value.trim();
+      let suggestion = input;
+      const endings = ["345", "-135", "4321", "-531", "065", "-123"];
+      const ending = endings[Math.floor(Math.random() * endings.length)];
+      suggestion += ending;
+      document.getElementById("noteInput").value = suggestion;
+    }
+  </script>
+</body>
+</html>
